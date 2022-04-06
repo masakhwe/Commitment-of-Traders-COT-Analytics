@@ -21,15 +21,8 @@ URL_PREFIX = "https://www.cftc.gov/files/dea/history"
 DATASET_FILE = "cot_reports_{{execution_date.strftime(\'%Y\')}}.zip"
 URL_TEMPLATE = URL_PREFIX + "/" + "fut_fin_xls_{{execution_date.strftime(\'%Y\')}}.zip"
 
-# URL_PREFIX = "https://s3.amazonaws.com/nyc-tlc/trip+data"
-# DATASET_FILE = "yellow_tripdata_{{execution_date.strftime(\'%Y_%b\')}}.csv"
-# URL_TEMPLATE = URL_PREFIX + "/" + "yellow_tripdata_{{execution_date.strftime(\'%Y-%m\')}}.csv"
-
-
 path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 
-
-# NOTE: takes 20 mins, at an upload speed of 800kbps. Faster if your internet has a better upload speed
 def upload_to_gcs(bucket, object_name, local_file):
     """
     Ref: https://cloud.google.com/storage/docs/uploading-objects#storage-upload-object-python
@@ -54,7 +47,7 @@ def upload_to_gcs(bucket, object_name, local_file):
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2011, 1, 1),
-    "end_date": datetime(2022, 3, 31),
+   # "end_date": datetime(2022, 1, 1),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -66,13 +59,14 @@ with DAG(
     default_args=default_args,
     catchup=True,
     max_active_runs=3,
-    tags=['dtc-de'],
+    tags=['cot'],
 ) as dag:
 
     download_dataset_task = BashOperator(
-        task_id="cot_reports_download_task",
+        task_id="download_task",
         bash_command=f"curl -sS {URL_TEMPLATE} > {path_to_local_home}/{DATASET_FILE}"
     )
+
 
     local_to_gcs_task = PythonOperator(
         task_id="local_to_gcs_task",
@@ -85,4 +79,4 @@ with DAG(
     )
 
 
-    download_dataset_task  >> local_to_gcs_task
+    download_dataset_task >> local_to_gcs_task
