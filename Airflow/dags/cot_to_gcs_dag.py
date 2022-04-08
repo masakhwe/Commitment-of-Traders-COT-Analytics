@@ -9,20 +9,19 @@ from datetime import datetime
 from google.cloud import storage
 
 
-# https://www.cftc.gov/files/dea/history/fut_fin_xls_2011.zip
-# https://www.cftc.gov/files/dea/history/fut_fin_xls_2012.zip
-# https://www.cftc.gov/files/dea/history/fut_fin_xls_2019.zip
-
-
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 
 URL_PREFIX = "https://www.cftc.gov/files/dea/history"
 DATASET_FILE = "cot_reports_{{execution_date.strftime(\'%Y\')}}.zip"
+DATASET_FILE_UNZIPED = "cot_reports_{{execution_date.strftime(\'%Y\')}}.xls"
 URL_TEMPLATE = URL_PREFIX + "/" + "fut_fin_xls_{{execution_date.strftime(\'%Y\')}}.zip"
+
 
 path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 
+
+# NOTE: takes 20 mins, at an upload speed of 800kbps. Faster if your internet has a better upload speed
 def upload_to_gcs(bucket, object_name, local_file):
     """
     Ref: https://cloud.google.com/storage/docs/uploading-objects#storage-upload-object-python
@@ -47,7 +46,7 @@ def upload_to_gcs(bucket, object_name, local_file):
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2011, 1, 1),
-   # "end_date": datetime(2022, 1, 1),
+    #"end_date": datetime(2022, 1, 1),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -58,25 +57,36 @@ with DAG(
     schedule_interval="@yearly",
     default_args=default_args,
     catchup=True,
-    max_active_runs=3,
+    max_active_runs=1,
     tags=['cot'],
 ) as dag:
 
     download_dataset_task = BashOperator(
         task_id="download_task",
-        bash_command=f"curl -sS {URL_TEMPLATE} > {path_to_local_home}/{DATASET_FILE}"
+        bash_command=f"cd {path_to_local_home} \
+                        && wget -O {DATASET_FILE} {URL_TEMPLATE} \
+                        && ls -alh"
     )
 
+    unzip_dataset_task = BashOperator(
+    task_id="unzip_task",
+    bash_command=f"cd {path_to_local_home} \
+                    && ls -alh \
+                    && rm -rf *.xls \
+                    && unzip {DATASET_FILE} \
+                    && mv FinFutYY.xls {DATASET_FILE_UNZIPED} \
+                    && ls -alh" 
+    )
 
     local_to_gcs_task = PythonOperator(
         task_id="local_to_gcs_task",
         python_callable=upload_to_gcs,
         op_kwargs={
             "bucket": BUCKET,
-            "object_name": f"raw/{DATASET_FILE}",
-            "local_file": f"{path_to_local_home}/{DATASET_FILE}",
+            "object_name": f"raw/{DATASET_FILE_UNZIPED}",
+            "local_file": f"{path_to_local_home}/{DATASET_FILE_UNZIPED}",
         },
     )
 
 
-    download_dataset_task >> local_to_gcs_task
+    download_dataset_task >> unzip_dataset_task >> local_to_gcs_task

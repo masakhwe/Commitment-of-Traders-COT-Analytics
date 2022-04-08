@@ -5,8 +5,11 @@ FROM apache/airflow:2.2.3
 ENV AIRFLOW_HOME=/opt/airflow
 
 USER root
-RUN apt-get update -qq && apt-get install vim -qqq
-# git gcc g++ -qqq
+RUN apt-get update -qq \
+    && apt-get install vim -qqq \
+    && sudo apt-get install -y unzip \
+    && apt-get install -y wget
+
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
