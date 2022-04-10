@@ -12,10 +12,13 @@ from google.cloud import storage
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 
+#sample url
+# https://www.cftc.gov/files/dea/history/fut_fin_txt_2011.zip
+
 URL_PREFIX = "https://www.cftc.gov/files/dea/history"
 DATASET_FILE = "cot_reports_{{execution_date.strftime(\'%Y\')}}.zip"
-DATASET_FILE_UNZIPED = "cot_reports_{{execution_date.strftime(\'%Y\')}}.xls"
-URL_TEMPLATE = URL_PREFIX + "/" + "fut_fin_xls_{{execution_date.strftime(\'%Y\')}}.zip"
+DATASET_FILE_UNZIPED = "cot_reports_{{execution_date.strftime(\'%Y\')}}.txt"
+URL_TEMPLATE = URL_PREFIX + "/" + "fut_fin_txt_{{execution_date.strftime(\'%Y\')}}.zip"
 
 
 path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
@@ -41,6 +44,7 @@ def upload_to_gcs(bucket, object_name, local_file):
 
     blob = bucket.blob(object_name)
     blob.upload_from_filename(local_file)
+
 
 
 default_args = {
@@ -74,7 +78,7 @@ with DAG(
                     && ls -alh \
                     && rm -rf *.xls \
                     && unzip {DATASET_FILE} \
-                    && mv FinFutYY.xls {DATASET_FILE_UNZIPED} \
+                    && mv FinFutYY.txt {DATASET_FILE_UNZIPED} \
                     && ls -alh" 
     )
 
