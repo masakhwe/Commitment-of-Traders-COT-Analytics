@@ -1,3 +1,4 @@
 /logs
 .env
 .ipynb_checkpoints/
+*.csv
