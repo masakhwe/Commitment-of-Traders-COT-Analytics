@@ -1,52 +1,22 @@
 import pyspark
 from pyspark.sql import SparkSession
-from pyspark.conf import SparkConf
-from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 from pyspark.sql import types
 
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
+PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 
-# Configuration
-load_dotenv()
-credentials_location = os.getenv('GCP_CREDENTIALS_LOCATION')
-gcp_bucket_name = os.getenv('GCP_BUCKET')
-
-jar_1 = "/Users/Manu/lib/spark-bigquery-with-dependencies_2.12-0.24.2.jar"
-jar_2 = "/Users/Manu/lib/gcs-connector-hadoop3-2.2.5.jar"
-
-conf = SparkConf() \
-    .setMaster('local[*]') \
-    .setAppName('test') \
-    .set("spark.jars", f'{jar_1}, {jar_2}') \
-    .set("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-    .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", credentials_location)
-
-
-# Context
-sc = SparkContext(conf=conf)
-
-hadoop_conf = sc._jsc.hadoopConfiguration()
-
-hadoop_conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-hadoop_conf.set("fs.gs.auth.service.account.json.keyfile", credentials_location)
-hadoop_conf.set("fs.gs.auth.service.account.enable", 'true')
-
-
-# Session
 spark = SparkSession.builder \
-    .config("spark.jars.packages", "com.crealytics:spark-excel_2.11:0.12.2", conf=sc.getConf()) \
+    .appName('cot_report')\
     .getOrCreate()
 
 
 # Reading data from google cloud storage
 cot = spark.read \
-    .text(f'gs://{gcp_bucket_name}/raw/*')
+    .text('gs://commitment_of_traders_338822/raw/*')
 
 
 # Extract the column names from the row object
@@ -95,7 +65,7 @@ cot_panda['Open_Interest_All'] = cot_panda['Open_Interest_All'].astype(int)
 
 
 # Temporary save to local environment
-cot_panda.to_csv('cot_panda.csv', index=False)
+cot_panda.to_csv('gs://temp_bucket_338822/code/cot_panda.csv', index=False)
 
 
 # Define Schema
@@ -194,7 +164,7 @@ schema = types.StructType([
 cot_panda_sp = spark.read \
         .option('header', 'true') \
         .schema(schema) \
-        .csv('cot_panda.csv')
+        .csv('gs://temp_bucket_338822/code/cot_panda.csv')
 
 
 
@@ -211,7 +181,7 @@ cot_panda_sp = cot_panda_sp.withColumnRenamed('Report_Date_as_YYYY-MM-DD', 'Repo
 
 
 # Writing to file the cleaned version with correct data types
-cot_panda_sp.write.parquet(f'gs://{gcp_bucket_name}/cleaned/pq', mode='overwrite')
+cot_panda_sp.write.parquet(f'gs://commitment_of_traders_338822/cleaned/pq', mode='overwrite')
 
 
 # Select the required columns for analysis
@@ -276,13 +246,17 @@ required_cols = [
 
 cot_select = cot_panda_sp.select(required_cols)
 
+# Filter the latest data only that was released on Tuesday of that week
+report_date = datetime.today() - timedelta(days = 4)
+report_date_string = f"{report_date.year}-{report_date.month}-{report_date.day}"
+cot_select_update = cot_select.filter(cot_select['Report_Date'] >= report_date_string) 
 
 # Writing the resulting dataframe as BigQuery table
-cot_select.write \
+cot_select_update.write \
     .format('bigquery') \
-    .option('project', 'awesome-treat-338822') \
-    .option('parentProject', 'awesome-treat-338822') \
+    .option('project', PROJECT_ID) \
+    .option('parentProject', PROJECT_ID) \
     .option('table', 'committment_of_traders.cot') \
     .option("temporaryGcsBucket","temp_bucket_338822") \
-    .mode('overwrite') \
+    .mode('append') \
     .save()
