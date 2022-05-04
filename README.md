@@ -14,3 +14,7 @@ This project involves development of a data pipeline that will process the commi
 
 
 ### Architecture
+
+
+### Final Result
+![result image](https://github.com/masakhwe/Commitment-of-Traders-COT-Analytics/blob/main/Documentation/cot.png)
