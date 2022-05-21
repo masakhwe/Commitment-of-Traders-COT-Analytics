@@ -8,6 +8,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+MAIN_BUCKET = os.environ.get("GCP_BUCKET")
+TEMP_BUCKET = os.environ.get("GCP_TEMP_BUCKET")
 
 spark = SparkSession.builder \
     .appName('cot_report')\
@@ -16,7 +18,7 @@ spark = SparkSession.builder \
 
 # Reading data from google cloud storage
 cot = spark.read \
-    .text('gs://commitment_of_traders_338822/raw/*')
+    .text(f'gs://{MAIN_BUCKET}/raw/*')
 
 
 # Extract the column names from the row object
@@ -65,7 +67,7 @@ cot_panda['Open_Interest_All'] = cot_panda['Open_Interest_All'].astype(int)
 
 
 # Temporary save to local environment
-cot_panda.to_csv('gs://temp_bucket_338822/code/cot_panda.csv', index=False)
+cot_panda.to_csv(f'gs://{TEMP_BUCKET}/code/cot_panda.csv', index=False)
 
 
 # Define Schema
@@ -164,7 +166,7 @@ schema = types.StructType([
 cot_panda_sp = spark.read \
         .option('header', 'true') \
         .schema(schema) \
-        .csv('gs://temp_bucket_338822/code/cot_panda.csv')
+        .csv(f'gs://{TEMP_BUCKET}/code/cot_panda.csv')
 
 
 
@@ -181,7 +183,7 @@ cot_panda_sp = cot_panda_sp.withColumnRenamed('Report_Date_as_YYYY-MM-DD', 'Repo
 
 
 # Writing to file the cleaned version with correct data types
-cot_panda_sp.write.parquet(f'gs://commitment_of_traders_338822/cleaned/pq', mode='overwrite')
+cot_panda_sp.write.parquet(f'gs://{MAIN_BUCKET}/cleaned/pq', mode='overwrite')
 
 
 # Select the required columns for analysis
@@ -257,6 +259,6 @@ cot_select_update.write \
     .option('project', PROJECT_ID) \
     .option('parentProject', PROJECT_ID) \
     .option('table', 'committment_of_traders.cot') \
-    .option("temporaryGcsBucket","temp_bucket_338822") \
+    .option("temporaryGcsBucket",f"{TEMP_BUCKET}") \
     .mode('append') \
     .save()

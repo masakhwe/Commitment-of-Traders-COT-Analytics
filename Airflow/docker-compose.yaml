@@ -58,16 +58,18 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    GOOGLE_APPLICATION_CREDENTIALS: /.google/credentials/google_credentials.json
-    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: 'google-cloud-platform://?extra__google_cloud_platform__key_path=/.google/credentials/google_credentials.json'
-    GCP_PROJECT_ID: 'awesome-treat-338822'
-    GCP_GCS_BUCKET: 'commitment_of_traders_338822'
+    GOOGLE_APPLICATION_CREDENTIALS: ${GCP_CREDENTIALS_LOCATION}
+    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: 'google-cloud-platform://?extra__google_cloud_platform__key_path=${GCP_CREDENTIALS_LOCATION}'
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+    GCP_BUCKET: ${GCP_BUCKET}
+    GCP_TEMP_BUCKET: ${GCP_TEMP_BUCKET}
+  
 
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
-    - ~/.google/credentials/:/.google/credentials:ro.
+    - ~/.google/credentials/:/.google/credentials:ro
 
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
