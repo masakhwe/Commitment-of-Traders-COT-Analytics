@@ -16,6 +16,7 @@ from google.cloud import storage
 
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
+TEMP_BUCKET = os.environ.get("GCP_TEMP_BUCKET")
 
 #sample url
 # https://www.cftc.gov/files/dea/history/fut_fin_txt_2022.zip
@@ -28,10 +29,10 @@ path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 
 CLUSTER_NAME = 'cot-pyspark-cluster'
 REGION = 'europe-west6'
-MAIN_PYTHON_FILE_URI = 'gs://temp_bucket_338822/code/main.py'
-PYTHON_FILE_URIS = 'gs://temp_bucket_338822/code/dag.py'
-jar_file_1 = "gs://temp_bucket_338822/code/data_proc_jar_files/gcs-connector-hadoop3-2.2.5.jar"
-jar_file_2 = "gs://temp_bucket_338822/code/data_proc_jar_files/spark-bigquery-with-dependencies_2.12-0.24.2.jar"
+MAIN_PYTHON_FILE_URI = f'gs://{TEMP_BUCKET}/code/main.py'
+PYTHON_FILE_URIS = f'gs://{TEMP_BUCKET}/code/dag.py'
+jar_file_1 = f"gs://{TEMP_BUCKET}/code/data_proc_jar_files/gcs-connector-hadoop3-2.2.5.jar"
+jar_file_2 = f"gs://{TEMP_BUCKET}/code/data_proc_jar_files/spark-bigquery-with-dependencies_2.12-0.24.2.jar"
 
 
 # dataproc cluster configuration
@@ -87,7 +88,7 @@ def upload_to_gcs(bucket, object_name, local_file):
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2011, 1, 1),#datetime(2022, 4, 30),
+    "start_date": datetime(2022, 6, 10),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -97,7 +98,7 @@ with DAG(
     dag_id = "commitment_of_traders",
     schedule_interval = '0 0 * * 6', # weekly on saturday morning
     default_args = default_args,
-    catchup = True,
+    catchup = False,
     max_active_runs = 1,
     tags = ['cot'],
 ) as dag:
