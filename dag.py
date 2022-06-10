@@ -1,5 +1,6 @@
 from collections import deque
-class Dag(object):
+
+class Pipeline(object):
     def __init__(self):
         self.graph= {}
 

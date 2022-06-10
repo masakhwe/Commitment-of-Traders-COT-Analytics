@@ -4,15 +4,15 @@ from pyspark.sql import types
 
 import os
 from datetime import datetime, date, timedelta
-from dag import Dag
+from dag import Pipeline
 
-credentials_location = os.getenv('GCP_CREDENTIALS_LOCATION')
+credentials_location = os.environ.get('GCP_CREDENTIALS_LOCATION')
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 gcp_bucket_name = os.environ.get("GCP_BUCKET")
 gcp_temporary_bucket = os.environ.get("GCP_TEMP_BUCKET")
 
 
-add_to_dag = Dag()
+add_to_dag = Pipeline()
 
 
 @add_to_dag.task()
@@ -27,8 +27,8 @@ def connection_setup():
                 .getOrCreate()
 
     cot_df = spark.read \
-        .option('header', 'true') \
-        .csv(f'gs://{gcp_bucket_name}/raw/*_{data_date}.txt')
+                .option('header', 'true') \
+                .csv(f'gs://{gcp_bucket_name}/raw/*_{data_date}.txt')
 
     return cot_df
 

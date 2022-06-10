@@ -15,7 +15,7 @@ from google.cloud import storage
 
 
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-BUCKET = os.environ.get("GCP_GCS_BUCKET")
+BUCKET = os.environ.get("GCP_BUCKET")
 TEMP_BUCKET = os.environ.get("GCP_TEMP_BUCKET")
 
 #sample url
