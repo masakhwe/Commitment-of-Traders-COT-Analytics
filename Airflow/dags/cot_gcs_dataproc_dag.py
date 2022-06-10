@@ -22,13 +22,14 @@ BUCKET = os.environ.get("GCP_GCS_BUCKET")
 
 URL_PREFIX = "https://www.cftc.gov/files/dea/history"
 DATASET_FILE = "cot_reports_{{execution_date.strftime(\'%Y\')}}.zip"
-DATASET_FILE_UNZIPED = "cot_reports_{{execution_date.strftime(\'%Y\')}}.txt"
+DATASET_FILE_UNZIPED = "cot_reports_{{execution_date.strftime(\'%Y-%m-%d\')}}.txt"
 URL_TEMPLATE = URL_PREFIX + "/" + "fut_fin_txt_{{execution_date.strftime(\'%Y\')}}.zip"
 path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 
 CLUSTER_NAME = 'cot-pyspark-cluster'
 REGION = 'europe-west6'
-PYSPARK_URI = 'gs://temp_bucket_338822/code/cot.py'
+MAIN_PYTHON_FILE_URI = 'gs://temp_bucket_338822/code/main.py'
+PYTHON_FILE_URIS = 'gs://temp_bucket_338822/code/dag.py'
 jar_file_1 = "gs://temp_bucket_338822/code/data_proc_jar_files/gcs-connector-hadoop3-2.2.5.jar"
 jar_file_2 = "gs://temp_bucket_338822/code/data_proc_jar_files/spark-bigquery-with-dependencies_2.12-0.24.2.jar"
 
@@ -53,7 +54,8 @@ PYSPARK_JOB = {
     "reference": {"project_id": PROJECT_ID},
     "placement": {"cluster_name": CLUSTER_NAME},
     "pyspark_job": {
-        "main_python_file_uri": PYSPARK_URI,
+        "main_python_file_uri": MAIN_PYTHON_FILE_URI,
+        "python_file_uris": [PYTHON_FILE_URIS], 
         "jar_file_uris": [jar_file_1, jar_file_2]
     },
     
@@ -85,7 +87,7 @@ def upload_to_gcs(bucket, object_name, local_file):
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2022, 4, 30),
+    "start_date": datetime(2011, 1, 1),#datetime(2022, 4, 30),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -95,7 +97,7 @@ with DAG(
     dag_id = "commitment_of_traders",
     schedule_interval = '0 0 * * 6', # weekly on saturday morning
     default_args = default_args,
-    catchup = False,
+    catchup = True,
     max_active_runs = 1,
     tags = ['cot'],
 ) as dag:
