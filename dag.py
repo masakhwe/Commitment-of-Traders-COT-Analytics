@@ -62,8 +62,8 @@ class Pipeline(object):
 
     def run(self):
         """
-            This function will run the added tasks(function) in which the output of the
-            first function will be the input of the second function and so on.
+            This function will run the tasks(nodes) as organized by the organize_task function above
+            It will also create a dictionary that will save the output of each task
         """
         counted_dependencies = self.count_depencies()
         completed_tasks = {}
