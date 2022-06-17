@@ -90,3 +90,4 @@ class Pipeline(object):
                 self.add(depends_on, func)
             return func 
         return inner
+

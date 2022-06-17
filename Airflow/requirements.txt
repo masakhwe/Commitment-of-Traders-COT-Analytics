@@ -3,3 +3,5 @@ numpy
 pandas
 gcsfs
 dotenv
+pyarrow
+pandas_gbq
