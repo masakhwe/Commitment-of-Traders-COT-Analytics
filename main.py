@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from datetime import date, timedelta
 from google.oauth2 import service_account
-from dag import Pipeline
+from custom_dag import Pipeline
 from dotenv import load_dotenv
 
 
@@ -119,4 +119,5 @@ def write_to_bigquery(cot_df):
     return cot_df
 
 
-add_to_dag.run()
+if __name__ == "__main__":
+    add_to_dag.run()
