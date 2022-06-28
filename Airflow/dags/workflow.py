@@ -1,23 +1,20 @@
 import sys
-#sys.path.append('/Users/Manu/Commitment-of-Traders-COT-Analytics/Airflow/config')
 import os
 import numpy as np
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from google.oauth2 import service_account
 from google.cloud import storage
-# from dotenv import load_dotenv
 
 
 class Pipeline(object):
 
     def __init__(self):
-        #load_dotenv()
-        self.credentials_location = os.environ.get('GCP_CREDENTIALS_LOCATION')
+        self.credentials_location = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
         self.project_id = os.environ.get("GCP_PROJECT_ID")
         self.gcp_bucket_name = os.environ.get("GCP_BUCKET")
         self.gcp_temporary_bucket = os.environ.get("GCP_TEMP_BUCKET")
-        self.credentials = os.environ.get("credentials")
+        self.path_to_local_home = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 
 
     def upload_to_gcs(self, bucket, object_name, local_file):
@@ -42,41 +39,20 @@ class Pipeline(object):
         blob.upload_from_filename(self.local_file)
 
 
-
-    def organize_columns(self):
+    def organize_columns(self, local_file):
         """
             This function does the following:
-                1. sets pandas connection to gcs and reads cot data into a dataframe
                 2. organizes the report dates into one column since they spread 3 different columns by default
-                3. Writes the resulting df into gcs for processing by the next task
+                3. Writes the resulting df into locally for processing by the next task
         """
-        organize_df = pd.DataFrame()
-        current_year = date.today().year
+        organize_df = pd.read_csv(local_file)
 
-        for year in range(2011, current_year + 1):
-            path = f'gs://{self.gcp_bucket_name}/raw/cot_reports_{year}-*.txt'
-            df = pd.read_csv(path, storage_options={"token": self.credentials})
-            organize_df = organize_df.append(df, ignore_index=True)
-
-
-        conditions = [(organize_df['Report_Date_as_YYYY-MM-DD'].isnull()),
-                    (organize_df['Report_Date_as_YYYY-MM-DD'].notnull())
-                    ]
-        
-        values = [organize_df['Report_Date_as_MM_DD_YYYY'],
-                organize_df['Report_Date_as_YYYY-MM-DD']
-                ]
-        
-        organize_df['report_date'] = np.select(conditions, values)
-        
-        # convert to datetime type
-        organize_df['report_date'] = pd.to_datetime(organize_df['report_date'], yearfirst=True)
-        
-        organize_df = organize_df.drop(['Report_Date_as_MM_DD_YYYY', 'Report_Date_as_YYYY-MM-DD',  'As_of_Date_In_Form_YYMMDD'], axis=1)
-        
     
-        organize_df.to_parquet(f'gs://{self.gcp_bucket_name}/processing/organize_columns.parquet',
-                            storage_options={"token": self.credentials})
+        organize_df['Report_Date_as_YYYY-MM-DD'] = pd.to_datetime(organize_df['Report_Date_as_YYYY-MM-DD'], yearfirst=True)
+        organize_df.rename({'Report_Date_as_YYYY-MM-DD': 'report_date'}, axis=1, inplace=True)
+      
+        organize_df.to_parquet(f"{self.path_to_local_home}/organize_columns.parquet")
+
 
   
 
@@ -84,24 +60,23 @@ class Pipeline(object):
         """
         This function fetches the most recent unprocessed data
         """
-        path = f"gs://{self.gcp_bucket_name}/processing/organize_columns.parquet"
-        df_latest = pd.read_parquet(path, storage_options={"token": self.credentials})
+        path = f"{self.path_to_local_home}/organize_columns.parquet"
+        df_latest = pd.read_parquet(path)
 
         report_release = date.today() - timedelta(days = 4)
         df_latest = df_latest[df_latest['report_date'] >= report_release]
         
 
-        df_latest.to_parquet(f'gs://{self.gcp_bucket_name}/processing/latest_data.parquet',
-                            storage_options={"token": self.credentials})
+        df_latest.to_parquet(f"{self.path_to_local_home}/latest_data.parquet")
 
 
 
     def clean_columns(self):
         """
-            This fuction makes corrections on some columns
+            This function makes corrections on some columns and uploads to gcs
         """ 
-        path = f"gs://{self.gcp_bucket_name}/processing/latest_data.parquet"
-        df_cleaned_cols  = pd.read_parquet(path, storage_options={"token": self.credentials})
+        path = f"{self.path_to_local_home}/latest_data.parquet"
+        df_cleaned_cols  = pd.read_parquet(path)
 
         # separate market and Exchange names
         df_cleaned_cols['market_name'] = df_cleaned_cols['Market_and_Exchange_Names'].str.split('-').str[0]
@@ -115,8 +90,13 @@ class Pipeline(object):
         start_cols = ['market_name', 'exchange_name', 'report_date']
         df_cleaned_cols = df_cleaned_cols[start_cols + [col for col in df_cleaned_cols.columns if col not in start_cols]]
         
-        df_cleaned_cols.to_parquet(f'gs://{self.gcp_bucket_name}/processing/clean_columns.parquet',
-                            storage_options={"token": self.credentials})
+        df_cleaned_cols.to_parquet(f"{self.path_to_local_home}/clean_columns.parquet")
+
+        # upload local parquet file to gcs
+        bucket = self.gcp_bucket_name
+        upload_location = f"cleaned/paquet/cot_cleaned_{datetime.today()}.parquet"
+        local_file = f"{self.path_to_local_home}/clean_columns.parquet"
+        self.upload_to_gcs(bucket, upload_location, local_file)
 
 
 
@@ -124,13 +104,16 @@ class Pipeline(object):
         """
             This function Writes to BigQuery as a table that will be consumed by dbt
         """
-        path = f"gs://{self.gcp_bucket_name}/processing/clean_columns.parquet"
-        df_bigquery = pd.read_parquet(path, storage_options={"token": self.credentials})
+        path = f"{self.path_to_local_home}/clean_columns.parquet"
+        df_bigquery = pd.read_parquet(path)
 
-        authorize = service_account.Credentials.from_service_account_file(self.credentials)
+        authorize = service_account.Credentials.from_service_account_file(self.credentials_location)
         df_bigquery.to_gbq(
-                        destination_table = 'committment_of_traders.cot_pandas',
+                        destination_table = 'committment_of_traders.cot',
                         project_id = self.project_id,
                         credentials = authorize,
-                        if_exists = 'replace'
+                        if_exists = 'append'
                     )
+
+
+        

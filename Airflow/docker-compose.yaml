@@ -63,6 +63,7 @@ x-airflow-common:
     GCP_PROJECT_ID: ${GCP_PROJECT_ID}
     GCP_BUCKET: ${GCP_BUCKET}
     GCP_TEMP_BUCKET: ${GCP_TEMP_BUCKET}
+
   
 
   volumes:

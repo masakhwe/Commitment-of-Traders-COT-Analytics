@@ -23,7 +23,7 @@ pipeline = Pipeline()
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2022, 6, 10),
+    "start_date": datetime(2022, 7, 2),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -32,7 +32,7 @@ with DAG(
     dag_id = "commitment_of_traders",
     schedule_interval = '0 0 * * 6', # weekly on saturday morning
     default_args = default_args,
-    catchup = False,
+    catchup = True,
     max_active_runs = 1,
     tags = ['cot'],
 ) as dag:
@@ -60,21 +60,16 @@ with DAG(
         },
     )
 
-    delete_processed_files_task = BashOperator(
-        task_id = 'clean_up',
-        bash_command = f"cd {path_to_local_home} \
-                        && rm -rf cot_reports_*" 
-    )
-
     organize_columns_task = PythonOperator(
         task_id = "organize_columns_task",
-        python_callable = pipeline.organize_columns
+        python_callable = pipeline.organize_columns,
+        op_kwargs = {"local_file": f"{path_to_local_home}/{DATASET_FILE_UNZIPED}"}
     )
 
-    # get_latest_data_task = PythonOperator(
-    #     task_id = "get_latest_data_task",
-    #     python_callable = pipeline.get_latest_data
-    # )
+    get_latest_data_task = PythonOperator(
+        task_id = "get_latest_data_task",
+        python_callable = pipeline.get_latest_data
+    )
 
     clean_columns_task = PythonOperator(
         task_id = "clean_columns_task",
@@ -86,5 +81,12 @@ with DAG(
         python_callable = pipeline.write_df_to_bigquery
     )
 
+    delete_processed_files_task = BashOperator(
+    task_id = 'clean_up',
+    bash_command = f"cd {path_to_local_home} \
+                    && rm -rf cot_reports_* \
+                    && rm -rf *.parquet"
+    )
 
-    download_dataset_task >> unzip_dataset_task >> local_to_gcs_task >> delete_processed_files_task >> organize_columns_task >> clean_columns_task >> write_df_to_bigquery_task
+
+    download_dataset_task >> unzip_dataset_task >> local_to_gcs_task >> organize_columns_task >> get_latest_data_task >> clean_columns_task >> write_df_to_bigquery_task >> delete_processed_files_task

@@ -1,6 +1,5 @@
 apache-airflow-providers-google
 numpy
 pandas
-gcsfs
 pyarrow
 pandas_gbq
