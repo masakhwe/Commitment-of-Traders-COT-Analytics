@@ -23,7 +23,7 @@ pipeline = Pipeline()
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2022, 7, 2),
+    "start_date": days_ago(-4),
     "depends_on_past": False,
     "retries": 1,
 }
@@ -32,7 +32,7 @@ with DAG(
     dag_id = "commitment_of_traders",
     schedule_interval = '0 0 * * 6', # weekly on saturday morning
     default_args = default_args,
-    catchup = True,
+    catchup = False,
     max_active_runs = 1,
     tags = ['cot'],
 ) as dag:

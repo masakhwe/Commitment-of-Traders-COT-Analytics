@@ -49,6 +49,7 @@ class Pipeline(object):
 
     
         organize_df['Report_Date_as_YYYY-MM-DD'] = pd.to_datetime(organize_df['Report_Date_as_YYYY-MM-DD'], yearfirst=True)
+        organize_df['Report_Date_as_YYYY-MM-DD'] = organize_df['Report_Date_as_YYYY-MM-DD'].dt.date
         organize_df.rename({'Report_Date_as_YYYY-MM-DD': 'report_date'}, axis=1, inplace=True)
       
         organize_df.to_parquet(f"{self.path_to_local_home}/organize_columns.parquet")
